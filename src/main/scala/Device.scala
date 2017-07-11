@@ -1,3 +1,5 @@
+import Device.{ReadTemperature, RecordTemperature, RespondTemperature, TemperatureRecorded}
+import DeviceManager.{DeviceRegistered, RequestTrackDevice}
 import akka.actor.{Actor, ActorLogging, Props}
 
 /**
@@ -14,13 +16,22 @@ object Device {
 }
 
 class Device(groupId: String, deviceId: String) extends Actor with ActorLogging {
-  import Device._
   var lastTemperatureReading: Option[Double] = None
 
   override def preStart(): Unit = log.info("Device actor {}-{} started", groupId, deviceId)
+
   override def postStop(): Unit = log.info("Device actor {}-{} stopped", groupId, deviceId)
 
   override def receive: Receive = {
+    case RequestTrackDevice(`groupId`, `deviceId`) =>
+      sender() ! DeviceRegistered
+
+    case RequestTrackDevice(groupId, deviceId) =>
+      log.warning(
+        "Ignoring TrackDevice request for {}-{}.This actor is responsible for {}-{}.",
+        groupId, deviceId, this.groupId, this.deviceId
+      )
+
     case RecordTemperature(id, value) =>
       log.info("Recorded temperature reading {} with {}", value, id)
       lastTemperatureReading = Some(value)

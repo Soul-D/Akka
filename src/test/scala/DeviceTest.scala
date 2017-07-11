@@ -1,7 +1,7 @@
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import org.scalatest.{FlatSpec, Matchers}
-
+import scala.concurrent.duration._
 /**
   * Created by WU on 2017-07-10.
   */
@@ -40,4 +40,38 @@ class DeviceTest extends FlatSpec with Matchers{
     response2.value should ===(Some(55.0))
   }
 
+  it should "reply to registration requests" in {
+    val probe = TestProbe()
+    val deviceActor = system.actorOf(Device.props("group", "device"))
+
+    deviceActor.tell(DeviceManager.RequestTrackDevice("group", "device"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+    probe.lastSender should ===(deviceActor)
+  }
+
+  it should "ignore wrong registration requests" in {
+    val probe = TestProbe()
+    val deviceActor = system.actorOf(Device.props("group", "device"))
+
+    deviceActor.tell(DeviceManager.RequestTrackDevice("wrongGroup", "device"), probe.ref)
+    probe.expectNoMsg(500.milliseconds)
+
+    deviceActor.tell(DeviceManager.RequestTrackDevice("group", "Wrongdevice"), probe.ref)
+    probe.expectNoMsg(500.milliseconds)
+  }
+
+  it should "return same actor for same deviceId" in {
+    val probe = TestProbe()
+    val groupActor = system.actorOf(DeviceGroup.props("group"))
+
+    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+    val deviceActor1 = probe.lastSender
+
+    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
+    probe.expectMsg(DeviceManager.DeviceRegistered)
+    val deviceActor2 = probe.lastSender
+
+    deviceActor1 should ===(deviceActor2)
+  }
 }
