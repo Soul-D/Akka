@@ -1,15 +1,20 @@
+import DeviceGroup.{ReplyDeviceList, RequestDeviceList}
 import DeviceManager.RequestTrackDevice
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props, Terminated}
 
 /**
   * Created by WU on 2017-07-11.
   */
 object DeviceGroup {
   def props(groupId: String): Props = Props(new DeviceGroup(groupId))
+
+  final case class RequestDeviceList(requestId: Long)
+  final case class ReplyDeviceList(requestId: Long, ids: Set[String])
 }
 
 class DeviceGroup(groupId: String) extends Actor with ActorLogging {
   var deviceIdToActor = Map.empty[String, ActorRef]
+  var actorToDeviceId = Map.empty[ActorRef, String]
 
   override def preStart(): Unit = log.info("DeviceGroup {} started", groupId)
 
@@ -23,14 +28,25 @@ class DeviceGroup(groupId: String) extends Actor with ActorLogging {
         case None =>
           log.info("Creating device actor for {}", trackMsg.deviceId)
           val deviceActor = context.actorOf(Device.props(groupId, trackMsg.deviceId), s"device-${trackMsg.deviceId}")
+          context.watch(deviceActor)
+          actorToDeviceId += deviceActor -> trackMsg.deviceId
           deviceIdToActor += trackMsg.deviceId -> deviceActor
           deviceActor forward trackMsg
       }
 
-    case RequestTrackDevice(groupId, deviceId) =>
+    case RequestTrackDevice(groupId, _) =>
       log.warning(
         "Ignoring TrackDevice request for {}. This actor is responsible for {}.",
         groupId, this.groupId
       )
+
+    case Terminated(deviceActor) =>
+      val deviceId = actorToDeviceId(deviceActor)
+      log.info("Device actor for {} has been terminated", deviceId)
+      actorToDeviceId -= deviceActor
+      deviceIdToActor -= deviceId
+
+    case RequestDeviceList(requestId) =>
+      sender() ! ReplyDeviceList(requestId, deviceIdToActor.keySet)
   }
 }

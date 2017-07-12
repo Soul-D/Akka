@@ -60,18 +60,4 @@ class DeviceTest extends FlatSpec with Matchers{
     probe.expectNoMsg(500.milliseconds)
   }
 
-  it should "return same actor for same deviceId" in {
-    val probe = TestProbe()
-    val groupActor = system.actorOf(DeviceGroup.props("group"))
-
-    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
-    probe.expectMsg(DeviceManager.DeviceRegistered)
-    val deviceActor1 = probe.lastSender
-
-    groupActor.tell(DeviceManager.RequestTrackDevice("group", "device1"), probe.ref)
-    probe.expectMsg(DeviceManager.DeviceRegistered)
-    val deviceActor2 = probe.lastSender
-
-    deviceActor1 should ===(deviceActor2)
-  }
 }
